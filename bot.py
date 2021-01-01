@@ -1,39 +1,159 @@
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler,MessageHandler, Filters
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# pylint: disable=W0613, C0116
+# type: ignore[union-attr]
+# This program is dedicated to the public domain under the CC0 license.
 
-import telebot
-from telebot import types
+"""
+First, a few callback functions are defined. Then, those functions are passed to
+the Dispatcher and registered at their respective places.
+Then, the bot is started and runs until we press Ctrl-C on the command line.
+Usage:
+Example of a bot-user conversation using ConversationHandler.
+Send /start to initiate the conversation.
+Press Ctrl-C on the command line or send a signal to the process to stop the
+bot.
+"""
 
-import telebot
+import logging
+from typing import Dict
 
-bot = telebot.TeleBot("1493512945:AAGZP-tl9uw6qTyL2iwxmD1UOWLEniHf1r4")
+from telegram import ReplyKeyboardMarkup, Update
+from telegram.ext import (
+    Updater,
+    CommandHandler,
+    MessageHandler,
+    Filters,
+    ConversationHandler,
+    CallbackContext,
+)
 
+# Enable logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+)
 
-@bot.message_handler(content_types=['new_chat_members'])
-def delete_join_message(m):
-    # If bot is not admin, then it will not be able to delete message.
-    try:
-        bot.delete_message(m.chat.id,m.message_id)
-    except:
-        if m.new_chat_member.id != bot.get_me().id:
-            bot.send_message(m.chat.id,"Please make me an admin in order for me to remove the join and leave messages on this group!")
-        else:
-            bot.send_message(m.chat.id,"Hi! I am your trusty GroupSilencer Bot! Thanks for adding me! To use me, make me an admin and I will be able to delete all the pesky notification when a member joins or leaves the group!")
+logger = logging.getLogger(__name__)
 
-@bot.message_handler(content_types=['left_chat_member'])
-def delete_leave_message(m):
-    # If bot is the one that is being removed, it will not be able to delete the leave message.
-    if m.left_chat_member.id != bot.get_me().id:
-        try:
-            bot.delete_message(m.chat.id,m.message_id)
-        except:
-            bot.send_message(m.chat.id,"Please make me an admin in order for me to remove the join and leave messages on this group!")
+CHOOSING, TYPING_REPLY, TYPING_CHOICE = range(3)
 
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-	bot.reply_to(message, "😋 Please add me to your groups\n    እባክዎን ወደ ቡድኖችዎ  ያስገቡኝ  \n            👇👇\n  https://t.me/JoinHiderGTIBot?startgroup=inpvbtn \n\n ❗️ Do not forget that in order to be able to do my job properly, I must be the group administrator and have the necessary permissions.\n ❗️ ሥራዬን በአግባቡ ለመወጣት የቡድን አስተዳዳሪ መሆን እና አስፈላጊ ፈቃዶች መኖሬን መዘንጋት የለብዎትም።")  \
-
-
+reply_keyboard = [
+    ['Age', 'Favourite colour'],
+    ['Number of siblings', 'Something else...'],
+    ['Done'],
+]
+markup = ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
 
 
+def facts_to_str(user_data: Dict[str, str]) -> str:
+    facts = list()
 
-bot.polling()
+    for key, value in user_data.items():
+        facts.append(f'{key} - {value}')
+
+    return "\n".join(facts).join(['\n', '\n'])
+
+
+def start(update: Update, context: CallbackContext) -> int:
+    update.message.reply_text(
+        "Hi! My name is Doctor Botter. I will hold a more complex conversation with you. "
+        "Why don't you tell me something about yourself?",
+        reply_markup=markup,
+    )
+
+    return CHOOSING
+
+
+def regular_choice(update: Update, context: CallbackContext) -> int:
+    text = update.message.text
+    context.user_data['choice'] = text
+    update.message.reply_text(f'Your {text.lower()}? Yes, I would love to hear about that!')
+
+    return TYPING_REPLY
+
+
+def custom_choice(update: Update, context: CallbackContext) -> int:
+    update.message.reply_text(
+        'Alright, please send me the category first, ' 'for example "Most impressive skill"'
+    )
+
+    return TYPING_CHOICE
+
+
+def received_information(update: Update, context: CallbackContext) -> int:
+    user_data = context.user_data
+    text = update.message.text
+    category = user_data['choice']
+    user_data[category] = text
+    del user_data['choice']
+
+    update.message.reply_text(
+        "Neat! Just so you know, this is what you already told me:"
+        f"{facts_to_str(user_data)} You can tell me more, or change your opinion"
+        " on something.",
+        reply_markup=markup,
+    )
+
+    return CHOOSING
+
+
+def done(update: Update, context: CallbackContext) -> int:
+    user_data = context.user_data
+    if 'choice' in user_data:
+        del user_data['choice']
+
+    update.message.reply_text(
+        f"I learned these facts about you: {facts_to_str(user_data)} Until next time!"
+    )
+
+    user_data.clear()
+    return ConversationHandler.END
+
+
+def main() -> None:
+    # Create the Updater and pass it your bot's token.
+    # Make sure to set use_context=True to use the new context based callbacks
+    # Post version 12 this will no longer be necessary
+    updater = Updater("1230921328:AAHJd3AyhU1nAfBlJHDZLAO431ND1qLm8Zk", use_context=True)
+
+    # Get the dispatcher to register handlers
+    dispatcher = updater.dispatcher
+
+    # Add conversation handler with the states CHOOSING, TYPING_CHOICE and TYPING_REPLY
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('start', start)],
+        states={
+            CHOOSING: [
+                MessageHandler(
+                    Filters.regex('^(Age|Favourite colour|Number of siblings)$'), regular_choice
+                ),
+                MessageHandler(Filters.regex('^Something else...$'), custom_choice),
+            ],
+            TYPING_CHOICE: [
+                MessageHandler(
+                    Filters.text & ~(Filters.command | Filters.regex('^Done$')), regular_choice
+                )
+            ],
+            TYPING_REPLY: [
+                MessageHandler(
+                    Filters.text & ~(Filters.command | Filters.regex('^Done$')),
+                    received_information,
+                )
+            ],
+        },
+        fallbacks=[MessageHandler(Filters.regex('^Done$'), done)],
+    )
+
+    dispatcher.add_handler(conv_handler)
+
+    # Start the Bot
+    updater.start_polling()
+
+    # Run the bot until you press Ctrl-C or the process receives SIGINT,
+    # SIGTERM or SIGABRT. This should be used most of the time, since
+    # start_polling() is non-blocking and will stop the bot gracefully.
+    updater.idle()
+
+
+if __name__ == '__main__':
+    main()
