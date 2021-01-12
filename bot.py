@@ -1,52 +1,40 @@
-from os import environ
-# Moved Back to asyncio-dev branch of pyrogram
-from pyrogram import Client, Filters, InlineKeyboardButton, InlineKeyboardMarkup
-import pyshorteners
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler,MessageHandler, Filters
 
-API_ID = environ.get('API_ID')
-API_HASH = environ.get('API_HASH')
-BOT_TOKEN = environ.get('BOT_TOKEN')
-API_KEY = environ.get('API_KEY')
-
-bot = Client('Shortlink bot',
-             api_id=API_ID,
-             api_hash=API_HASH,
-             bot_token=BOT_TOKEN,
-             workers=50,
-             sleep_threshold=10)
+import telebot
+from telebot import types
 
 
-@bot.on_message(Filters.command('start') & Filters.private)
-async def start(bot, update):
-    await update.reply(
-        f"**Hi {update.chat.first_name}!**\n\n"
-        "I'm shortlink bot. Just send me link and get adsless short link")
+import telebot
+
+bot = telebot.TeleBot("1230921328:AAGDtUl--03JMQ6oWbnBd3aZYs0eny3fX-g")
 
 
-@bot.on_message(Filters.regex(r'https?://[^\s]+') & Filters.private)
-async def link_handler(bot, update):
-    link = update.matches[0].group(0)
-    if API_KEY:
-      try:
-        s = pyshorteners.Shortener(api_key=API_KEY) 
-        shortened_url = s.cuttly.short(link)
-        button = [[InlineKeyboardButton("Link 🔗", url=shortened_url)]]
-        markup = InlineKeyboardMarkup(button)
-        await update.reply_text(text=f'Here is your shortlink \n`{shortened_url}`', reply_markup=markup, quote=True)
-        
-      except Exception as e:
-        await update.reply(f'Error: {e}', quote=True)
-    else:
-      try:
-        s = pyshorteners.Shortener() 
-        shortened_url = s.dagd.short(link)
-        button = [[InlineKeyboardButton("Link 🔗", url=shortened_url)]]
-        markup = InlineKeyboardMarkup(button)
-        await update.reply_text(text=f'Here is your shortlink \n`{shortened_url}`', reply_markup=markup, quote=True)
-        
-      except Exception as e:
-        await update.reply(f'Error: {e}', quote=True)
+@bot.message_handler(content_types=['new_chat_members'])
+def delete_join_message(m):
+    # If bot is not admin, then it will not be able to delete message.
+    try:
+        bot.delete_message(m.chat.id,m.message_id)
+    except:
+        if m.new_chat_member.id != bot.get_me().id:
+            bot.send_message(m.chat.id,"Please make me an admin in order for me to remove the join and leave messages on this group!")
+        else:
+            bot.send_message(m.chat.id,"Hi! I am your trusty GroupSilencer Bot! Thanks for adding me! To use me, make me an admin and I will be able to delete all the pesky notification when a member joins or leaves the group!")
 
-      
+@bot.message_handler(content_types=['left_chat_member'])
+def delete_leave_message(m):
+    # If bot is the one that is being removed, it will not be able to delete the leave message.
+    if m.left_chat_member.id != bot.get_me().id:
+        try:
+            bot.delete_message(m.chat.id,m.message_id)
+        except:
+            bot.send_message(m.chat.id,"Please make me an admin in order for me to remove the join and leave messages on this group!")
 
-bot.run()
+@bot.message_handler(commands=['start', 'help'])
+def send_welcome(message):
+	bot.reply_to(message, "😋 Please add me to your groups\n    እባክዎን ወደ ቡድኖችዎ  ያስገቡኝ  \n            👇👇\n  https://t.me/JoinHiderGTIBot?startgroup=inpvbtn \n\n ❗️ Do not forget that in order to be able to do my job properly, I must be the group administrator and have the necessary permissions.\n ❗️ ሥራዬን በአግባቡ ለመወጣት የቡድን አስተዳዳሪ መሆን እና አስፈላጊ ፈቃዶች መኖሬን መዘንጋት የለብዎትም።")  \
+
+
+
+
+
+bot.polling()
