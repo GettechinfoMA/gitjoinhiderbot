@@ -6,7 +6,7 @@ from telebot import types
 
 import telebot
 
-bot = telebot.TeleBot("1230921328:AAGDtUl--03JMQ6oWbnBd3aZYs0eny3fX-g")
+bot = telebot.TeleBot("1230921328:AAEQwvxQpNCei-N5EF4DJEcKmiswkyG3UwE")
 
 
 @bot.message_handler(content_types=['new_chat_members'])
